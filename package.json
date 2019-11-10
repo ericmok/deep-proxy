@@ -1,0 +1,14 @@
+{
+  "name": "deep-proxy",
+  "version": "1.0.0",
+  "description": "Wrap objects arbitrarily deep with Proxies to capture Mutation events.",
+  "main": "deep-proxy.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Immutable"
+  ],
+  "author": "Eric M",
+  "license": "ISC"
+}
