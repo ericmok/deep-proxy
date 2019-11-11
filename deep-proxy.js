@@ -2,10 +2,13 @@ const SYM_IS_WRAPPED = Symbol.for("IS_WRAPPED");
 SYM_IS_WRAPPED.SYM_IS_WRAPPED = true;
 const SYM_DELTA = Symbol.for("SYM_DELTA");
 SYM_DELTA.SYM_IS_WRAPPED = true;
+const SYM_DEEP_PROXY_PARENT = Symbol.for("SYM_DEEP_PROXY_PARENT");
 
-const innerHandler = {
+const innerHandler = (parent, mutationHandler = (obj, props)=>{
+  console.log(`Mutation: ${obj} ${props}`);
+}) => ({
   set(obj, prop, value) {
-    console.log(`LOG MUTATION `);
+    mutationHandler(obj, prop, value);
 
     obj[SYM_DELTA] = {
       prop: prop
@@ -19,9 +22,9 @@ const innerHandler = {
     console.log("TEST");
     return Proxy;
   }
-}
+});
 
-function wrap(obj, prop) {
+function wrap(obj, prop, mutationHandler) {
   
   if (!prop) {
     return obj[prop];
@@ -31,32 +34,25 @@ function wrap(obj, prop) {
     return obj[prop];
   }
 
+  // Symbols like SYM_IS_WRAPPED aren't objects, so
+  // don't have to worry about infinite recursive gets
+  // wrapping Symbols with Proxies
   if (typeof obj[prop] !== "object") {
-  //   try {
-  //     console.log(`NOT OBJ: ${obj}[${prop}] = ${obj[prop]}`);
-  //     console.log(typeof obj[prop]);  
-  //   } catch(e) {
-  //     console.log(`NOT OBJ: ${obj} SYMBOL`)
-  //   }
-
     return obj[prop];
   }
 
-  // SYM_IS_WRAPPED isn't an object, no recursion
-  // if (prop === SYM_IS_WRAPPED) {
-  //   return obj[SYM_IS_WRAPPED];
-  // }
-
+  // Mechanism to not overwrap wrapped objects
   if (obj[prop][SYM_IS_WRAPPED] === true) {
-    // Hopefully this is the proxy in the prop
-    // Supposed to return cached proxy that replaced this prop
-
     return obj[prop];
   }
+
+  // Store owner
+  obj[prop][SYM_DEEP_PROXY_PARENT] = obj;
 
   // Wrap
   obj[prop][SYM_IS_WRAPPED] = true;
-  const ret = new Proxy(obj[prop], innerHandler);
+
+  const ret = new Proxy(obj[prop], innerHandler(obj, mutationHandler));
 
   obj[prop] = ret;
   return ret;
@@ -66,8 +62,6 @@ let handler = {
   get(obj, prop) {
 
     if (typeof obj[prop] === "object") {
-      // return wrapAttribute(obj, obj[prop]);
-
       return wrap(obj, prop);
     }
 
@@ -76,15 +70,11 @@ let handler = {
 };
 
 
-function proxyWrap(obj) {
-  // return new Proxy(obj, handler);
-  return new Proxy(obj, innerHandler);
+function proxyWrap(obj, mutationHandler) {
+  return new Proxy(obj, innerHandler(obj, mutationHandler));
 }
 
 let test;
-// let test = proxyWrap({name: "check"});
-
-// console.log(test.name);
 
 test = proxyWrap({
   text: "test",
@@ -106,22 +96,14 @@ module.exports = {
   proxyWrap
 };
 
-// console.log(`AUTHOR ${test.author}`);
-// console.log(`AUTHOR NAME ${test.author.name}`);
 console.log(`${test.deep1}`)
 console.log(`${test.deep1.deep2}`)
 console.log(`${test.deep1.deep2.deep3}`)
 console.log(`${test.deep1.deep2.deep3.txt3}`)
 console.log(`${test.deep1.deep2.txt2}`)
+
+test.deep1.deep2.deep3.txt3 = "wjoeifo";
+
 console.log(`${test.deep1.txt1}`)
 
-// console.log(`${test.deep1.deep2.deep3 instanceof Proxy}`)
-
-
-
-// console.log(`${test.deep1}`)
-// console.log(`${test.deep1.deep2}`)
-
-// console.log(test.author.name);
-// test.author.name = "ring";
-// console.log(test.author.name);
+console.log(`${test.deep1.deep2[SYM_DEEP_PROXY_PARENT] === test.deep1}`)
